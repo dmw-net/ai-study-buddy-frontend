@@ -59,6 +59,7 @@
  * - computed: 创建计算属性
  */
 import { onMounted, onUnmounted, reactive, ref, watch, nextTick, computed } from 'vue';
+import { API_CONFIG, getApiUrl } from '../config/api';
 
 /**
  * TypeScript 类型定义
@@ -170,13 +171,12 @@ function openStream(text: string, messageIndex: number) {
   closeStream();
 
   // 构建 SSE 请求 URL
-  // 检测是否为生产环境，在生产环境使用完整的后端URL
-  // 在开发环境继续使用相对路径（由Vite代理处理）
-  const isProduction = import.meta.env.PROD;
-  const baseUrl = isProduction 
-    ? 'http://65835af6.r6.cpolar.cn/api'
-    : '/api';
-  const url = `${baseUrl}/ai/chat?memoryId=${encodeURIComponent(memoryId.value)}&message=${encodeURIComponent(text)}`;
+  // 使用配置文件中的API设置，避免硬编码
+  const params = {
+    memoryId: memoryId.value.toString(),
+    message: text
+  };
+  const url = getApiUrl(API_CONFIG.ENDPOINTS.CHAT, params);
   
   // 创建 EventSource 对象（浏览器原生 SSE API）
   const es = new EventSource(url);
