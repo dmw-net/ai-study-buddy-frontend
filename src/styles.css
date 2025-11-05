@@ -1,0 +1,48 @@
+/**
+ * styles.css - 全局样式文件
+ * 功能：定义应用的基础样式和重置样式
+ */
+
+/**
+ * CSS 变量定义（:root 选择器）
+ * color-scheme: light 指定使用浅色主题
+ */
+:root {
+  color-scheme: light;
+}
+
+/**
+ * 全局样式重置
+ * box-sizing: border-box 让元素的宽高包含内边距和边框
+ * 这是现代前端开发的最佳实践
+ */
+* { 
+  box-sizing: border-box; 
+}
+
+/**
+ * 布局基础样式
+ * - html, body, #app 都占满 100% 高度，确保应用可以全屏显示
+ * - margin: 0 移除浏览器默认的外边距
+ */
+html, body, #app { 
+  height: 100%; 
+  margin: 0; 
+}
+
+/**
+ * 字体设置
+ * 使用系统字体栈，确保在不同操作系统上都有良好的显示效果
+ * 字体优先级：
+ * 1. 苹果系统字体（macOS、iOS）
+ * 2. Windows 系统字体（Segoe UI）
+ * 3. 其他系统字体
+ * 4. 中文字体（PingFang SC、Microsoft YaHei）
+ * 5. 通用无衬线字体
+ */
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+  color: #1f2328;  /* 文字颜色 */
+}
+
+
