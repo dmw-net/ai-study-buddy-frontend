@@ -36,11 +36,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8081',  // 后端服务器地址
         changeOrigin: true,                // 修改请求头中的 origin，确保跨域请求成功
-        secure: false,                     // 如果是 HTTPS，允许自签名证书
-        // SSE 专用配置
-        ws: true,                          // 启用 WebSocket 代理（SSE 也需要）
-        // 注意：Vite 的代理基于 http-proxy-middleware
-        // 对于 SSE 长连接，建议不在代理层设置超时
+        secure: false                      // 如果是 HTTPS，允许自签名证书
       }
     }
   }

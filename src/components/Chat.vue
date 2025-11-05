@@ -19,11 +19,10 @@
       -->
       <div v-for="(m, idx) in messages" :key="idx" class="message" :class="m.role">
         <!-- 消息气泡 -->
-      <div class="bubble">
-        <!-- 对AI助手的消息使用Markdown渲染，用户消息保持原样 -->
-        <div v-if="m.role === 'assistant'" class="markdown-content" v-html="renderMarkdown(m.content)"></div>
-        <pre v-else class="text">{{ m.content }}</pre>
-      </div>
+        <div class="bubble">
+          <!-- 使用 pre 标签保持文本格式（换行、空格等） -->
+          <pre class="text">{{ m.content }}</pre>
+        </div>
       </div>
     </div>
 
@@ -60,7 +59,6 @@
  * - computed: 创建计算属性
  */
 import { onMounted, onUnmounted, reactive, ref, watch, nextTick, computed } from 'vue';
-import { marked } from 'marked';
 
 /**
  * TypeScript 类型定义
@@ -72,15 +70,6 @@ type Role = 'user' | 'assistant';
 interface ChatMessage {
   role: Role;        // 消息发送者角色
   content: string;   // 消息内容
-}
-
-/**
- * Markdown 渲染函数
- * @param text 需要渲染的Markdown文本
- * @returns 渲染后的HTML字符串
- */
-function renderMarkdown(text: string): string {
-  return  marked.parse(text);
 }
 
 /**
@@ -109,19 +98,8 @@ const canSend = computed(() => inputText.value.trim().length > 0 && !loading.val
  * 生命周期钩子：组件挂载时执行
  */
 onMounted(() => {
-  // 从localStorage加载最近的会话
-  const sessionList = JSON.parse(localStorage.getItem('chat_sessions') || '[]');
-  if (sessionList.length > 0) {
-    // 按时间戳排序，获取最新的会话
-    sessionList.sort((a: any, b: any) => b.timestamp - a.timestamp);
-    if (!loadMessages(sessionList[0].id)) {
-      // 如果加载失败，显示欢迎消息
-      messages.push({ role: 'assistant', content: '你好，我是 AI 编程小助手。有什么可以帮你？' });
-    }
-  } else {
-    // 没有历史会话，显示欢迎消息
-    messages.push({ role: 'assistant', content: '你好，我是 AI 编程小助手。有什么可以帮你？' });
-  }
+  // 添加欢迎消息
+  messages.push({ role: 'assistant', content: '你好，我是 AI 编程小助手。有什么可以帮你？' });
 });
 
 /**
@@ -130,16 +108,11 @@ onMounted(() => {
 onUnmounted(() => {
   // 关闭 SSE 连接，释放资源
   closeStream();
-  
-  // 组件卸载前保存消息
-  if (messages.length > 0) {
-    saveMessages();
-  }
 });
 
 /**
  * 监听器：监听 messages 数组的变化
- * 当有新消息时，自动滚动到底部并保存消息
+ * 当有新消息时，自动滚动到底部
  */
 watch(messages, async () => {
   // 等待 Vue 完成 DOM 更新
@@ -147,10 +120,6 @@ watch(messages, async () => {
   // 如果有滚动容器引用，滚动到底部
   if (scrollContainer.value) {
     scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
-  }
-  // 自动保存消息到localStorage
-  if (messages.length > 0) {
-    saveMessages();
   }
 });
 
@@ -209,76 +178,6 @@ function openStream(text: string, messageIndex: number) {
   evtSource.value = es;
 
   /**
-   * 智能拼接 SSE 数据块
-   * 解决数据块在单词边界被切分导致缺少空格的问题
-   * 
-   * 问题场景：
-   * - 英文：后端发送 "! How can" + "I assist you" → 需要添加空格 → "! How can I assist you" ✅
-   * - 中文：后端发送 "你好" + "！有什么可以帮助" → 不需要空格 → "你好！有什么可以帮助" ✅
-   * - 中英混合：后端发送 "你好" + "hello" → 需要添加空格 → "你好 hello" ✅
-   * 
-   * 规则：
-   * 1. 中文之间不需要空格（中文词语之间本身就没有空格）
-   * 2. 英文单词之间需要空格（如果缺失）
-   * 3. 中英文混合时，在交界处需要空格
-   * 
-   * @param currentContent 当前已累积的内容
-   * @param newChunk 新收到的数据块
-   * @returns 拼接后的内容
-   */
-  function smartConcat(currentContent: string, newChunk: string): string {
-    // 如果当前内容为空，直接返回新块
-    if (!currentContent) {
-      return newChunk;
-    }
-    
-    // 如果新块为空，直接返回当前内容
-    if (!newChunk) {
-      return currentContent;
-    }
-    
-    // 如果新块开头已经有空格或标点，直接拼接（不需要额外处理）
-    if (/^[\s\.,!?;:，。！？；：]/.test(newChunk)) {
-      return currentContent + newChunk;
-    }
-    
-    // 获取当前内容的最后一个字符和新块的第一个字符
-    const lastChar = currentContent[currentContent.length - 1];
-    const firstChar = newChunk[0];
-    
-    // 判断字符类型
-    const isLastCharChinese = /[\u4e00-\u9fa5]/.test(lastChar);  // 中文字符
-    const isFirstCharChinese = /[\u4e00-\u9fa5]/.test(firstChar);
-    const isLastCharEnglish = /[a-zA-Z0-9]/.test(lastChar);     // 英文字母、数字
-    const isFirstCharEnglish = /[a-zA-Z0-9]/.test(firstChar);
-    const lastCharIsSpaceOrPunct = /[\s\.,!?;:，。！？；：\-_]/.test(lastChar);  // 空格、标点、连字符、下划线
-    const firstCharIsSpaceOrPunct = /[\s\.,!?;:，。！？；：\-_]/.test(firstChar);
-    
-    // 如果已经有空格或标点分隔，直接拼接
-    if (lastCharIsSpaceOrPunct || firstCharIsSpaceOrPunct) {
-      return currentContent + newChunk;
-    }
-    
-    // 情况1：两个都是中文 → 不需要空格
-    if (isLastCharChinese && isFirstCharChinese) {
-      return currentContent + newChunk;
-    }
-    
-    // 情况2：两个都是英文 → 需要添加空格（英文单词之间需要空格）
-    if (isLastCharEnglish && isFirstCharEnglish) {
-      return currentContent + ' ' + newChunk;
-    }
-    
-    // 情况3：中英文混合 → 需要添加空格（中英文交界处需要空格）
-    if ((isLastCharChinese && isFirstCharEnglish) || (isLastCharEnglish && isFirstCharChinese)) {
-      return currentContent + ' ' + newChunk;
-    }
-    
-    // 其他情况（数字、特殊字符等）直接拼接
-    return currentContent + newChunk;
-  }
-
-  /**
    * SSE 消息事件处理
    * 当服务器发送数据时触发
    */
@@ -300,12 +199,10 @@ function openStream(text: string, messageIndex: number) {
     
     // 确保消息索引有效
     if (messageIndex >= 0 && messageIndex < messages.length) {
-      // 使用智能拼接函数，自动处理单词边界缺少空格的问题
-      // 这样即使后端在单词中间切分数据块，也能正确显示
-      messages[messageIndex].content = smartConcat(
-        messages[messageIndex].content,
-        e.data
-      );
+      // 将接收到的数据片段追加到助手消息内容中
+      // 使用数组索引直接更新，确保 Vue 响应式系统能检测到变化
+      // 这样就能实现逐字显示的效果
+      messages[messageIndex].content += e.data;
       console.log('已更新消息内容，当前长度:', messages[messageIndex].content.length);
     } else {
       console.error('消息索引无效:', messageIndex, '消息数组长度:', messages.length);
@@ -384,60 +281,6 @@ java.net.SocketTimeoutException: timeout
 }
 
 /**
- * 保存消息到localStorage
- */
-function saveMessages() {
-  try {
-    const chatData = {
-      messages: [...messages],
-      memoryId: memoryId.value,
-      timestamp: Date.now()
-    };
-    localStorage.setItem(`chat_${memoryId.value}`, JSON.stringify(chatData));
-    // 保存会话列表以便切换
-    const sessionList = JSON.parse(localStorage.getItem('chat_sessions') || '[]');
-    const existingSession = sessionList.find((s: any) => s.id === memoryId.value);
-    if (existingSession) {
-      existingSession.lastMessage = messages[messages.length - 1]?.content || '';
-      existingSession.timestamp = Date.now();
-    } else {
-      sessionList.push({
-        id: memoryId.value,
-        lastMessage: messages[messages.length - 1]?.content || '',
-        timestamp: Date.now()
-      });
-    }
-    localStorage.setItem('chat_sessions', JSON.stringify(sessionList));
-  } catch (error) {
-    console.error('保存消息失败:', error);
-  }
-}
-
-/**
- * 从localStorage加载消息
- */
-function loadMessages(sessionId: number) {
-  try {
-    const chatDataStr = localStorage.getItem(`chat_${sessionId}`);
-    if (chatDataStr) {
-      const chatData = JSON.parse(chatDataStr);
-      // 清空现有消息
-      messages.splice(0, messages.length);
-      // 添加保存的消息
-      chatData.messages.forEach((msg: ChatMessage) => {
-        messages.push(msg);
-      });
-      memoryId.value = chatData.memoryId;
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('加载消息失败:', error);
-    return false;
-  }
-}
-
-/**
  * 关闭 SSE 连接
  * 清理资源，重置状态
  */
@@ -458,133 +301,23 @@ function closeStream() {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  height: 100%; /* 确保占满可用空间 */
 }
 .chat-header {
   flex: 0 0 auto;
-  padding: 4px 16px; /* 减小内边距 */
+  padding: 8px 16px;
   font-size: 12px;
   color: #666;
   border-bottom: 1px dashed #eee;
-  height: 32px; /* 设置固定高度 */
-  display: flex;
-  align-items: center;
 }
 .chat-messages {
   flex: 1 1 auto;
   overflow: auto;
-  padding: 4px 16px; /* 进一步减小内边距 */
+  padding: 16px;
   background: #fafafa;
-  min-height: 0;
 }
 .message {
   display: flex;
-  margin-bottom: 4px; /* 进一步减小消息间距 */
-  min-height: 24px;
-}
-
-/* Markdown内容样式 */
-.markdown-content {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-family: inherit;
-  line-height: 1.6;
-}
-
-.markdown-content h1,
-.markdown-content h2,
-.markdown-content h3,
-.markdown-content h4,
-.markdown-content h5,
-.markdown-content h6 {
-  margin-top: 1.2em; /* 减小标题上边距 */
-  margin-bottom: 0.4em; /* 减小标题下边距 */
-  font-weight: 600;
-}
-
-.markdown-content h1 {
-  font-size: 1.8em;
-  border-bottom: 1px solid #eaecef;
-  padding-bottom: 0.3em;
-}
-
-.markdown-content h2 {
-  font-size: 1.5em;
-  border-bottom: 1px solid #eaecef;
-  padding-bottom: 0.3em;
-}
-
-.markdown-content h3 {
-  font-size: 1.3em;
-}
-
-.markdown-content p {
-  margin-bottom: 0.8em; /* 减小段落下边距 */
-}
-
-.markdown-content code {
-  background-color: #f6f8fa;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 0.9em;
-}
-
-.markdown-content pre {
-  background-color: #f6f8fa;
-  padding: 16px;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin-bottom: 1em;
-}
-
-.markdown-content pre code {
-  background-color: transparent;
-  padding: 0;
-  font-size: 0.9em;
-}
-
-.markdown-content blockquote {
-  border-left: 4px solid #dfe2e5;
-  padding: 0 1em;
-  color: #6a737d;
-  margin: 0 0 1em 0;
-}
-
-.markdown-content ul,
-.markdown-content ol {
-  padding-left: 2em;
-  margin-bottom: 1em;
-}
-
-.markdown-content li {
-  margin-bottom: 0.5em;
-}
-
-.markdown-content table {
-  border-collapse: collapse;
-  width: 100%;
-  margin-bottom: 1em;
-}
-
-.markdown-content table th,
-.markdown-content table td {
-  border: 1px solid #dfe2e5;
-  padding: 6px 13px;
-}
-
-.markdown-content table th {
-  background-color: #f6f8fa;
-  font-weight: 600;
-}
-
-.markdown-content a {
-  color: #0366d6;
-  text-decoration: none;
-}
-
-.markdown-content a:hover {
-  text-decoration: underline;
+  margin-bottom: 12px;
 }
 .message.user {
   justify-content: flex-end;
@@ -593,15 +326,12 @@ function closeStream() {
   justify-content: flex-start;
 }
 .bubble {
-  max-width: 80%; /* 增加最大宽度，减少水平空白 */
+  max-width: 75%;
   background: white;
   border: 1px solid #eee;
-  border-radius: 8px;
-  padding: 6px 8px; /* 进一步减小气泡内边距 */
+  border-radius: 10px;
+  padding: 10px 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  min-height: 24px;
-  display: flex;
-  align-items: center;
 }
 .message.user .bubble {
   background: #e8f3ff;
@@ -616,19 +346,17 @@ function closeStream() {
 .chat-input {
   flex: 0 0 auto;
   display: flex;
-  gap: 6px; /* 减小间距 */
-  padding: 6px 12px; /* 进一步减小内边距 */
+  gap: 8px;
+  padding: 12px;
   border-top: 1px solid #eee;
   background: #fff;
-  height: 48px; /* 设置固定高度 */
-  align-items: center;
 }
 .input {
   flex: 1 1 auto;
-  height: 36px; /* 减小高度 */
-  padding: 0 10px; /* 减小内边距 */
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid #ddd;
-  border-radius: 6px; /* 减小圆角 */
+  border-radius: 8px;
   outline: none;
 }
 .input:disabled {
@@ -636,16 +364,15 @@ function closeStream() {
 }
 .send {
   flex: 0 0 auto;
-  min-width: 70px; /* 减小宽度 */
-  height: 36px; /* 减小高度 */
-  padding: 0 10px; /* 减小内边距 */
+  min-width: 84px;
+  height: 40px;
+  padding: 0 14px;
   border: none;
-  border-radius: 6px; /* 减小圆角 */
+  border-radius: 8px;
   background: #1677ff;
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-  font-size: 14px; /* 减小字体 */
 }
 .send:disabled {
   background: #9ec5ff;

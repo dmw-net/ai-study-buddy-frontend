@@ -40,7 +40,7 @@ import Chat from './components/Chat.vue';
 /* 头部样式 */
 .app-header {
   flex: 0 0 auto;             /* 不放大、不缩小，固定高度 */
-  height: 56px;               /* 恢复高度 */
+  height: 56px;               /* 固定高度 56px */
   display: flex;              /* 内部使用 flex 布局 */
   align-items: center;        /* 垂直居中对齐 */
   padding: 0 16px;            /* 左右内边距 16px */
