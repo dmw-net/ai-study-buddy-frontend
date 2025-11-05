@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!--
+  index.html - HTML 入口文件
+  功能：定义页面的基本结构，Vue 应用将挂载到这里
+-->
+<html lang="zh-CN">
+  <head>
+    <!-- 
+      meta 标签配置
+      charset: 指定字符编码为 UTF-8（支持中文和特殊字符）
+      viewport: 移动端适配，设置视口宽度等于设备宽度，初始缩放比例为 1.0
+    -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- 页面标题：显示在浏览器标签页上 -->
+    <title>AI 编程小助手</title>
+    <script type="module" crossorigin src="/assets/index-CSNBVqhq.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-TpOEVVqf.css">
+  </head>
+  <body>
+    <!-- 
+      Vue 应用挂载点
+      #app 是 Vue 应用要挂载的 DOM 元素
+      main.ts 中的 createApp(App).mount('#app') 会将组件渲染到这里
+    -->
+    <div id="app"></div>
+    
+    <!-- 
+      应用入口脚本
+      type="module" 表示这是一个 ES6 模块
+      src="/src/main.ts" 指向 TypeScript 入口文件（Vite 会自动编译）
+    -->
+  </body>
+</html>
+
+
