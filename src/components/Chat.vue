@@ -170,8 +170,13 @@ function openStream(text: string, messageIndex: number) {
   closeStream();
 
   // 构建 SSE 请求 URL
-  // encodeURIComponent 对参数进行 URL 编码，防止特殊字符导致问题
-  const url = `/api/ai/chat?memoryId=${encodeURIComponent(memoryId.value)}&message=${encodeURIComponent(text)}`;
+  // 检测是否为生产环境，在生产环境使用完整的后端URL
+  // 在开发环境继续使用相对路径（由Vite代理处理）
+  const isProduction = import.meta.env.PROD;
+  const baseUrl = isProduction 
+    ? 'http://65835af6.r6.cpolar.cn/api'
+    : '/api';
+  const url = `${baseUrl}/ai/chat?memoryId=${encodeURIComponent(memoryId.value)}&message=${encodeURIComponent(text)}`;
   
   // 创建 EventSource 对象（浏览器原生 SSE API）
   const es = new EventSource(url);
@@ -218,19 +223,6 @@ function openStream(text: string, messageIndex: number) {
 
   /**
    * SSE 错误事件处理
-java.net.SocketTimeoutException: timeout
-	at okhttp3.internal.http2.Http2Stream$StreamTimeout.newTimeoutException(Http2Stream.kt:675) ~[okhttp-4.12.0.jar:na]
-	at okhttp3.internal.http2.Http2Stream$StreamTimeout.exitAndThrowIfTimedOut(Http2Stream.kt:684) ~[okhttp-4.12.0.jar:na]
-	at okhttp3.internal.http2.Http2Stream$FramingSource.read(Http2Stream.kt:380) ~[okhttp-4.12.0.jar:na]
-	at okhttp3.internal.connection.Exchange$ResponseBodySource.read(Exchange.kt:281) ~[okhttp-4.12.0.jar:na]
-	at okio.RealBufferedSource.select(RealBufferedSource.kt:232) ~[okio-jvm-3.6.0.jar:na]
-	at okhttp3.internal.sse.ServerSentEventReader.processNextEvent(ServerSentEventReader.kt:50) ~[okhttp-sse-4.12.0.jar:na]
-	at okhttp3.internal.sse.RealEventSource.processResponse(RealEventSource.kt:75) ~[okhttp-sse-4.12.0.jar:na]
-	at okhttp3.internal.sse.RealEventSource.onResponse(RealEventSource.kt:46) ~[okhttp-sse-4.12.0.jar:na]
-	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:519) ~[okhttp-4.12.0.jar:na]
-	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[na:na]
-	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642) ~[na:na]
-	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
    * 
    * 注意：EventSource 的 onerror 事件在以下情况都会触发：
    * 1. 服务器正常关闭连接（发送完数据后）- 这是正常的，不是错误
