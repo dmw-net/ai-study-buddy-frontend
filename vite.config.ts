@@ -16,7 +16,7 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
   // 插件配置：Vue 插件用于编译 .vue 单文件组件
   plugins: [vue()],
-  
+  base: '/ai-study-buddy-frontend/',  // 部署基础路径，根据实际仓库名修改
   // 开发服务器配置
   server: {
     port: 5173,  // 开发服务器端口号（默认 5173）
@@ -34,7 +34,7 @@ export default defineConfig({
      */
     proxy: {
       '/api': {
-        target: 'http://localhost:8081',  // 后端服务器地址
+        target: 'http://65835af6.r6.cpolar.cn/',  // 后端服务器地址
         changeOrigin: true,                // 修改请求头中的 origin，确保跨域请求成功
         secure: false                      // 如果是 HTTPS，允许自签名证书
       }

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<!--
+  404.html - 用于 GitHub Pages 的后备页面
+  功能：确保刷新页面时不会出现 404 错误，Vue 应用可以接管路由处理
+-->
+<html lang="zh-CN">
+  <head>
+    <!-- 
+      meta 标签配置
+      charset: 指定字符编码为 UTF-8（支持中文和特殊字符）
+      viewport: 移动端适配，设置视口宽度等于设备宽度，初始缩放比例为 1.0
+    -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- 页面标题：显示在浏览器标签页上 -->
+    <title>AI 编程小助手</title>
+  </head>
+  <body>
+    <!-- 
+      Vue 应用挂载点
+      #app 是 Vue 应用要挂载的 DOM 元素
+      main.ts 中的 createApp(App).mount('#app') 会将组件渲染到这里
+    -->
+    <div id="app"></div>
+    
+    <!-- 
+      应用入口脚本
+      type="module" 表示这是一个 ES6 模块
+      src="/src/main.ts" 指向 TypeScript 入口文件（Vite 会自动编译）
+    -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
