@@ -26,7 +26,7 @@ export default defineConfig({
   },
   // 插件配置：Vue 插件用于编译 .vue 单文件组件
   plugins: [vue()],
-  base: '/ai-study-buddy-frontend/',  // 部署基础路径（GitHub Pages 项目路径）
+  base: '/',  // 部署基础路径（GitHub Pages 项目路径）
   // 开发服务器配置
   server: {
     port: 5173,  // 开发服务器端口号（默认 5173）
