@@ -44,7 +44,7 @@ export default defineConfig({
      */
     proxy: {
       '/api': {
-        target: 'http://65835af6.r6.cpolar.cn/',  // 后端服务器地址
+        target: 'http://43.136.53.215:8081/',  // 后端服务器地址
         changeOrigin: true,                // 修改请求头中的 origin，确保跨域请求成功
         secure: false                      // 如果是 HTTPS，允许自签名证书（这里是 HTTP，不影响）
       }

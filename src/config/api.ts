@@ -10,7 +10,7 @@ export const API_CONFIG = {
   // 生产环境：直接使用后端的公网URL（需要后端支持跨域）
   // 开发环境：使用相对路径（由Vite代理处理跨域）
   BASE_URL: isProduction 
-    ? 'https://65835af6.r6.cpolar.cn/api'
+    ? 'http://43.136.53.215:8081/api'
     : '/api',
   
   // API端点路径
