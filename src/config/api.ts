@@ -1,29 +1,36 @@
-// API配置文件
-// 集中管理所有API相关的配置，便于维护和环境切换
+// ========================================
+// API 配置文件
+// 修改 .env 中的 VITE_API_BASE_URL 即可切换环境
+// ========================================
 
-// 检测当前环境
 const isProduction = import.meta.env.PROD;
 
-// 后端API的基础URL配置
+// 后端地址（从 .env 读取，修改 .env 文件即可生效）
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+
 export const API_CONFIG = {
-  // 基础URL - 根据环境选择不同的URL
-  // 生产环境：直接使用后端的公网URL（需要后端支持跨域）
-  // 开发环境：使用相对路径（由Vite代理处理跨域）
-  BASE_URL: isProduction 
-    ? 'https://api.2025521.online/api'
+  /**
+   * 基础 URL
+   * - 开发环境：使用 /api 相对路径，由 Vite 代理转发到后端
+   * - 生产环境：使用 VITE_API_BASE_URL + /api 拼完整地址
+   */
+  BASE_URL: isProduction
+    ? `${BASE_URL}/api`
     : '/api',
-  
-  // API端点路径
+
   ENDPOINTS: {
     CHAT: '/ai/chat'
   }
 };
 
-// 获取完整的API URL
+/**
+ * 获取完整的 API URL
+ * @param endpoint - API 端点路径，如 /ai/chat
+ * @param params - 查询参数键值对
+ */
 export function getApiUrl(endpoint: string, params?: Record<string, string>): string {
   let url = `${API_CONFIG.BASE_URL}${endpoint}`;
-  
-  // 如果有参数，添加到URL查询字符串
+
   if (params && Object.keys(params).length > 0) {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -31,6 +38,6 @@ export function getApiUrl(endpoint: string, params?: Record<string, string>): st
     });
     url += `?${searchParams.toString()}`;
   }
-  
+
   return url;
 }

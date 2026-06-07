@@ -20,8 +20,7 @@
       <div v-for="(m, idx) in messages" :key="idx" class="message" :class="m.role">
         <!-- 消息气泡 -->
         <div class="bubble">
-          <!-- 使用 pre 标签保持文本格式（换行、空格等） -->
-          <pre class="text">{{ m.content }}</pre>
+          <p class="text">{{ m.content }}</p>
         </div>
       </div>
     </div>
@@ -80,7 +79,7 @@ interface ChatMessage {
 const inputText = ref('');                    // 输入框内容
 const loading = ref(false);                   // 是否正在加载（发送请求中）
 const scrollContainer = ref<HTMLDivElement | null>(null);  // 消息容器的 DOM 引用
-const evtSource = ref<EventSource | null>(null);          // SSE 连接对象
+const abortController = ref<AbortController | null>(null);  // fetch 中断控制器，替代 EventSource
 const memoryId = ref(generateMemoryId());     // 会话 ID（用于区分不同对话）
 
 // reactive：用于对象和数组
@@ -140,149 +139,116 @@ function generateMemoryId(): number {
  * 在用户点击发送按钮或按回车时触发
  */
 function onSend() {
-  // 获取并清理输入文本
   const text = inputText.value.trim();
-  // 如果为空或正在加载，直接返回
   if (!text || loading.value) return;
 
-  // 1. 将用户消息添加到消息列表
   messages.push({ role: 'user', content: text });
-  // 2. 清空输入框
   inputText.value = '';
 
-  // 3. 创建一个空的助手消息占位符（用于实时显示 AI 回复）
   messages.push({ role: 'assistant', content: '' });
-  // 获取刚添加的消息索引（数组最后一个元素）
   const assistantMsgIndex = messages.length - 1;
 
-  // 4. 开始 SSE 流式请求，实时更新消息内容
   openStream(text, assistantMsgIndex);
 }
 
 /**
- * 打开 SSE 连接，接收流式响应
- * @param text 用户输入的消息
- * @param messageIndex 助手消息在数组中的索引（用于实时更新内容）
+ * 使用 fetch + ReadableStream 接收流式响应
+ * 替代 EventSource，避免换行符丢失 / SSE 解析兼容性问题
  */
-function openStream(text: string, messageIndex: number) {
-  // 设置加载状态
+async function openStream(text: string, messageIndex: number) {
   loading.value = true;
-  // 关闭之前的连接（如果有）
   closeStream();
 
-  // 构建 SSE 请求 URL
-  // 使用配置文件中的API设置，避免硬编码
   const params = {
     memoryId: memoryId.value.toString(),
     message: text
   };
   const url = getApiUrl(API_CONFIG.ENDPOINTS.CHAT, params);
-  
-  // 创建 EventSource 对象（浏览器原生 SSE API）
-  const es = new EventSource(url);
-  evtSource.value = es;
 
-  /**
-   * SSE 消息事件处理
-   * 当服务器发送数据时触发
-   */
-  es.onmessage = (e: MessageEvent) => {
-    // 调试日志：打印接收到的数据
-    console.log('收到 SSE 数据:', e.data);
-    
-    // 如果收到结束标记，关闭连接
-    if (e.data === '[DONE]') {
-      console.log('收到结束标记，关闭连接');
-      closeStream();
+  const controller = new AbortController();
+  abortController.value = controller;
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'Accept': 'text/event-stream' }
+    });
+
+    if (!response.ok) {
+      console.error('请求失败:', response.status);
+      loading.value = false;
       return;
     }
-    // 忽略心跳消息（ping、keepalive）和空数据
-    if (!e.data || e.data === 'ping' || e.data === 'keepalive') {
-      console.log('忽略心跳消息');
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      console.error('无法获取响应流');
+      loading.value = false;
       return;
     }
-    
-    // 确保消息索引有效
-    if (messageIndex >= 0 && messageIndex < messages.length) {
-      // 将接收到的数据片段追加到助手消息内容中
-      // 使用数组索引直接更新，确保 Vue 响应式系统能检测到变化
-      // 这样就能实现逐字显示的效果
-      messages[messageIndex].content += e.data;
-      console.log('已更新消息内容，当前长度:', messages[messageIndex].content.length);
-    } else {
-      console.error('消息索引无效:', messageIndex, '消息数组长度:', messages.length);
-    }
-  };
 
-  /**
-   * SSE 打开事件处理（连接建立成功）
-   */
-  es.onopen = () => {
-    console.log('SSE 连接已建立');
-  };
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-  /**
-   * SSE 错误事件处理
-   * 
-   * 注意：EventSource 的 onerror 事件在以下情况都会触发：
-   * 1. 服务器正常关闭连接（发送完数据后）- 这是正常的，不是错误
-   * 2. 网络连接中断 - 这是真正的错误
-   * 3. 服务器主动断开连接 - 可能是正常结束，也可能是错误
-   * 
-   * 因此我们需要通过 readyState 来判断：
-   * - EventSource.CONNECTING (0): 正在连接
-   * - EventSource.OPEN (1): 连接已打开
-   * - EventSource.CLOSED (2): 连接已关闭
-   */
-  es.onerror = (error) => {
-    // 获取当前消息内容长度，用于判断是否已收到数据
-    const hasReceivedData = messageIndex >= 0 && 
-                          messageIndex < messages.length && 
-                          messages[messageIndex].content.length > 0;
-    
-    // 根据连接状态和处理情况，给出不同的提示
-    // readyState === 0 (CONNECTING): 连接在建立过程中失败 - 通常是后端上游超时
-    // readyState === 2 (CLOSED): 连接已关闭 - 可能是正常结束或异常
-    if (es.readyState === EventSource.CLOSED) {
-      // 连接已关闭
-      if (hasReceivedData) {
-        // 已收到数据，可能是正常结束或后端上游超时但已返回部分数据
-        console.log('SSE 连接已关闭（数据已接收完成）');
-      } else {
-        // 未收到任何数据，可能是连接失败或后端上游超时
-        console.warn('SSE 连接关闭，未收到数据。可能是后端服务连接上游超时，请检查后端日志。');
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // 按 SSE 事件分隔符 \n\n 拆分
+      const parts = buffer.split('\n\n');
+      // 最后一个可能是不完整的，留在 buffer 中
+      buffer = parts.pop() || '';
+
+      for (const part of parts) {
+        const lines = part.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            // 去掉 "data:" 前缀，保留空格（空格是模型 token 的一部分，不能 trim）
+            const data = line.slice(5);
+            if (data === '[DONE]') {
+              continue;
+            }
+            if (messageIndex >= 0 && messageIndex < messages.length && data) {
+              messages[messageIndex].content += data;
+            }
+          }
+        }
       }
-    } else if (es.readyState === EventSource.CONNECTING) {
-      // 连接在建立过程中失败（最常见的情况）
-      // 这通常是因为后端上游服务超时（java.net.SocketTimeoutException）
-      if (hasReceivedData) {
-        // 已收到部分数据，但连接中断
-        console.warn('SSE 连接中断（后端上游可能超时），已接收部分数据');
-      } else {
-        // 未收到任何数据，连接就失败了
-        console.error('SSE 连接失败（后端上游可能超时），未收到任何数据。请检查后端服务状态。');
-      }
-    } else {
-      // 其他未知状态
-      console.error('SSE 连接出现未知错误，状态:', es.readyState, error);
     }
-    
-    // 关闭连接并重置加载状态
-    closeStream();
-  };
+
+    // 处理 buffer 中残留的数据
+    if (buffer) {
+      const lines = buffer.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          const data = line.slice(5);  // 保留空格，不 trim
+          if (data && data !== '[DONE]') {
+            if (messageIndex >= 0 && messageIndex < messages.length) {
+              messages[messageIndex].content += data;
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err.name !== 'AbortError') {
+      console.error('流式读取错误:', err);
+    }
+  } finally {
+    loading.value = false;
+  }
 }
 
 /**
- * 关闭 SSE 连接
- * 清理资源，重置状态
+ * 关闭流式连接
  */
 function closeStream() {
-  // 如果连接存在，关闭它
-  if (evtSource.value) {
-    evtSource.value.close();
-    evtSource.value = null;
+  if (abortController.value) {
+    abortController.value.abort();
+    abortController.value = null;
   }
-  // 重置加载状态
   loading.value = false;
 }
 </script>
@@ -331,9 +297,9 @@ function closeStream() {
 }
 .text {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   white-space: pre-wrap;
   word-break: break-word;
+  line-height: 1.6;
 }
 .chat-input {
   flex: 0 0 auto;
