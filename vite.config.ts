@@ -10,10 +10,10 @@ const API_TARGET = process.env.VITE_API_BASE_URL || 'http://localhost:8081';
 
 export default defineConfig({
   build: {
-    outDir: 'docs'
+    outDir: 'docs'  // 输出到子模块内，此目录由 GitHub Pages 部署
   },
   plugins: [vue()],
-  base: '/',
+  base: '/ai-study-buddy-frontend/', // GitHub Pages 项目站点路径
   server: {
     port: 5173,
     /**
